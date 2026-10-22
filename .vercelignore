@@ -1,0 +1,10 @@
+# Vercel에는 화면(index.html)과 함수(api/)만 올려요.
+# server.py는 로컬 전용이라 빼요. 남겨 두면 Vercel이 이걸 서버 진입점으로 착각할 수 있어요.
+server.py
+data/
+supabase/
+PRD.md
+README.md
+.env
+.env.*
+__pycache__/

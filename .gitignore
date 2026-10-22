@@ -1,0 +1,7 @@
+# DB 파일, 비밀값 파일, 파이썬 캐시, Vercel 설정 폴더는 커밋하지 않아요.
+data/
+.env
+.env.*
+__pycache__/
+.vercel/
+.DS_Store

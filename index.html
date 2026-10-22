@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>칭찬 릴레이</title>
+<style>*{box-sizing:border-box}body{font-family:"Arial Rounded MT Bold","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;color:#2B2926;background:#FFFCF8;line-height:1.65;margin:0}main{max-width:720px;margin:60px auto;padding:0 28px}small{font-weight:700;letter-spacing:.14em;color:#FF6F0F}h1{font-size:clamp(36px,6vw,56px);letter-spacing:-.05em;line-height:1.2}p{color:#7A7168}label{display:block;font-weight:700;margin-top:24px}input,textarea{width:100%;font:inherit;border:1px solid #E5D9CD;border-radius:18px;padding:14px;margin-top:8px}button{width:100%;margin-top:24px;padding:16px;background:#FF6F0F;color:#fff;border:0;border-radius:18px;font:inherit;font-weight:700;cursor:pointer}button:disabled{background:#FFF1E6;color:#A94A08;cursor:default}.note{font-size:13px;border-top:1px solid #F0E7DF;margin-top:32px;padding-top:20px}
+.baton{background:#FFF1E6;border-radius:22px;padding:18px 22px;font-weight:700;color:#A94A08}.baton strong{color:#FF6F0F}.error{color:#C2410C;font-weight:700;min-height:1.65em;margin:12px 0 0}
+h2{margin-top:48px;font-size:22px;letter-spacing:-.03em}ul{list-style:none;padding:0;margin:0}li{border:1px solid #F0E7DF;border-radius:22px;padding:18px 22px;margin-top:12px;background:#fff;overflow-wrap:anywhere}.who{font-weight:700}.who span{color:#FF6F0F}.msg{margin:6px 0;white-space:pre-wrap;word-break:break-word}.time{font-size:13px;color:#A39A90}.opt{font-weight:400;color:#A39A90}</style></head>
+<body><main><small>DB INC · PRAISE RELAY</small><h1>칭찬 릴레이</h1><p>칭찬을 받은 사람이 다음 바통을 이어받아 또 다른 사람을 칭찬해요.</p>
+<p class="baton" id="baton">불러오는 중…</p>
+<form id="form">
+<label for="from">보내는 사람</label><input id="from" maxlength="40" placeholder="내 이름">
+<label for="to">받는 사람 <span class="opt">(선택)</span></label><input id="to" maxlength="40" placeholder="칭찬할 사람, 이 사람이 다음 바통을 받아요">
+<label for="message">칭찬 내용</label><textarea id="message" rows="4" maxlength="500" placeholder="고마웠던 점, 멋졌던 점을 적어 주세요"></textarea>
+<p class="error" id="error" role="alert"></p>
+<button type="submit" id="submit">칭찬 바통 넘기기</button>
+</form>
+<h2>지금까지의 칭찬</h2>
+<ul id="list"></ul>
+<p class="note" id="empty" hidden>아직 칭찬이 없어요. 첫 칭찬을 남겨 주세요!</p>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+
+function renderBaton(baton) {
+  const el = $("baton");
+  el.textContent = "";
+  if (!baton) { el.textContent = "바통을 든 사람이 없어요. 칭찬을 남겨 새 릴레이를 시작해 주세요!"; return; }
+  const name = document.createElement("strong");
+  name.textContent = baton;
+  el.append("지금 바통: ", name, "님 차례예요");
+}
+
+function renderList(entries) {
+  const list = $("list");
+  list.textContent = "";
+  $("empty").hidden = entries.length > 0;
+  for (const p of entries) {
+    const li = document.createElement("li");
+    const who = document.createElement("div");
+    who.className = "who";
+    const arrow = document.createElement("span");
+    arrow.textContent = " → ";
+    who.append(p.name);
+    if (p.to) who.append(arrow, p.to);
+    const msg = document.createElement("p");
+    msg.className = "msg";
+    msg.textContent = p.message;
+    const time = document.createElement("div");
+    time.className = "time";
+    time.textContent = new Date(p.created_at).toLocaleString("ko-KR");
+    li.append(who, msg, time);
+    list.append(li);
+  }
+}
+
+async function load() {
+  try {
+    const res = await fetch("/api/entries");
+    const data = await res.json();
+    const baton = data.entries.length ? data.entries[0].to : null;
+    renderBaton(baton);
+    renderList(data.entries);
+    if (baton && !$("from").value) $("from").value = baton;
+  } catch {
+    $("baton").textContent = "서버에 연결하지 못했어요. python3 server.py 로 서버를 켜 주세요.";
+  }
+}
+
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("error").textContent = "";
+  $("submit").disabled = true;
+  try {
+    const res = await fetch("/api/entries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: $("from").value, message: $("message").value, to: $("to").value }),
+    });
+    const data = await res.json();
+    if (!res.ok) { $("error").textContent = data.error || "저장하지 못했어요."; return; }
+    $("from").value = data.entry.to || "";
+    $("to").value = "";
+    $("message").value = "";
+    await load();
+  } catch {
+    $("error").textContent = "서버에 연결하지 못했어요.";
+  } finally {
+    $("submit").disabled = false;
+  }
+});
+
+load();
+</script></body></html>
