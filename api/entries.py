@@ -3,6 +3,7 @@
 # 입력 검사(read_entry)는 로컬 server.py도 같이 써요.
 import json
 import os
+import sys
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler
 from urllib.error import HTTPError, URLError
@@ -84,6 +85,12 @@ def read_entry(handler):
 
 # ---- Supabase (REST API, 표준 라이브러리만 써요) ----
 
+SUPABASE_HINTS = {
+    401: "SUPABASE_SECRET_KEY 값이 맞는지 확인해 주세요.",
+    403: "SUPABASE_SECRET_KEY에 공개 키(anon/publishable)가 아니라 secret 키를 넣어 주세요.",
+    404: "SUPABASE_URL 값이나 entries 표(supabase/schema.sql 실행)를 확인해 주세요.",
+}
+
 def supabase(method, query="", payload=None):
     url = os.environ.get("SUPABASE_URL", "").rstrip("/")
     key = os.environ.get("SUPABASE_SECRET_KEY", "")
@@ -97,8 +104,14 @@ def supabase(method, query="", payload=None):
     try:
         with urlopen(request, timeout=8) as response:
             return json.loads(response.read())
-    except (HTTPError, URLError, TimeoutError, ValueError):
-        raise ApiError(502, "저장소(Supabase)에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.")
+    except HTTPError as e:
+        detail = e.read()[:300].decode("utf-8", "replace")
+        print(f"Supabase {e.code}: {detail}", file=sys.stderr)  # Vercel Logs에서 볼 수 있어요
+        hint = SUPABASE_HINTS.get(e.code, "Vercel Logs에서 자세한 내용을 확인해 주세요.")
+        raise ApiError(502, f"저장소(Supabase)가 {e.code}로 거절했어요. {hint}")
+    except (URLError, TimeoutError, ValueError) as e:
+        print(f"Supabase 연결 실패: {e!r}", file=sys.stderr)
+        raise ApiError(502, "저장소(Supabase)에 연결하지 못했어요. SUPABASE_URL 값을 확인해 주세요.")
 
 
 def to_entry(row):
